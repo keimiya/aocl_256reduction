@@ -13,8 +13,8 @@
  * @param input_ddr float16 (32bit*16=512bit=64byte) from DDR4-2133
  * @param output_ddr 
  */
-__kernel void reduction_float16(__global volatile const float16* restrict input_ddr,
-				__global volatile float* restrict outpu_ddr)
+__kernel void reduction_float16(__global  const float16* restrict input_ddr,
+				__global  float* restrict output_ddr)
 {
     const int REDUCTION_SIZE = 256;
     const int INPUT_WIDTH    = 16; // equal to float16
@@ -29,17 +29,19 @@ __kernel void reduction_float16(__global volatile const float16* restrict input_
     float buf7[REDUCTION_SIZE>>6];
     float buf8[REDUCTION_SIZE>>7];
     float buf9;
+    float16 temp;
 
     // 1st level: directory read the input value from DDR    
     for (int i = 0; i < REDUCTION_SIZE/INPUT_WIDTH; i++){
-    	buf1[(i*INPUT_WIDTH)+0] = input_ddr[i].s0 + input_ddr[i].s1;
-    	buf1[(i*INPUT_WIDTH)+1] = input_ddr[i].s2 + input_ddr[i].s3;
-    	buf1[(i*INPUT_WIDTH)+2] = input_ddr[i].s4 + input_ddr[i].s5;
-    	buf1[(i*INPUT_WIDTH)+3] = input_ddr[i].s6 + input_ddr[i].s7;
-    	buf1[(i*INPUT_WIDTH)+4] = input_ddr[i].s8 + input_ddr[i].s9;
-    	buf1[(i*INPUT_WIDTH)+5] = input_ddr[i].sA + input_ddr[i].sB;
-    	buf1[(i*INPUT_WIDTH)+6] = input_ddr[i].sC + input_ddr[i].sD;
-    	buf1[(i*INPUT_WIDTH)+7] = input_ddr[i].sE + input_ddr[i].sF;
+	temp = input_ddr[i];
+	buf1[(i*INPUT_WIDTH)+0] = temp.s0 + temp.s1;
+	buf1[(i*INPUT_WIDTH)+1] = temp.s2 + temp.s3;
+	buf1[(i*INPUT_WIDTH)+2] = temp.s4 + temp.s5;
+	buf1[(i*INPUT_WIDTH)+3] = temp.s6 + temp.s7;
+	buf1[(i*INPUT_WIDTH)+4] = temp.s8 + temp.s9;
+	buf1[(i*INPUT_WIDTH)+5] = temp.sA + temp.sB;
+	buf1[(i*INPUT_WIDTH)+6] = temp.sC + temp.sD;
+	buf1[(i*INPUT_WIDTH)+7] = temp.sE + temp.sF;
     }
 
 #pragma unroll 
@@ -74,6 +76,6 @@ __kernel void reduction_float16(__global volatile const float16* restrict input_
     sum += buf9;
     /* } */
     /* } */
-    *outpu_ddr = sum;
+    *output_ddr = sum;
 }
 

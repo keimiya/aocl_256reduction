@@ -1,0 +1,7 @@
+#!/bin/sh
+
+AOCL_BOARD_PACKAGE_ROOT="/opt/altera_pro/16.0/hld/board/altera_a10socdk/"
+TARGET=reduction_float16
+BOARD_PACKAGE_NAME=a10soc_2ddr
+
+aoc --profile -v -g ./device/${TARGET}.cl -o ./to_a10soc/${TARGET}.aocx --board ${BOARD_PACKAGE_NAME} --report

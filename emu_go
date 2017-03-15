@@ -1,0 +1,14 @@
+#!/bin/sh
+
+AOCL_BOARD_PACKAGE_ROOT="/opt/altera_pro/16.0/hld/board/altera_a10socdk/"
+TARGET=reduction_float16
+BOARD_PACKAGE_NAME=a10soc_2ddr
+
+echo -e "\e[32m COMPILEING OPENCL KERNEL  \e[m"
+aoc -c --save-temps --dot -g -v --report --board ${BOARD_PACKAGE_NAME} ./device/${TARGET}.cl -o ./device/${TARGET}.aoco
+# echo -e "\e[32m COMPILEING OPENCL KERNEL FOR EMULATION \e[m"
+# aoc -g -v --report -march=emulator --board ${BOARD_PACKAGE_NAME} ./device/${TARGET}.cl -o ./bin/${TARGET}.aocx
+# echo -e "\e[32m BUILDING HOST APPLICAION \e[m"
+# make
+# echo -e "\e[32m RUN EMULATION OF OPENCL KERNEL \e[m"
+# env CL_CONTEXT_EMULATOR_DEVICE_ALTERA=1 ./bin/host

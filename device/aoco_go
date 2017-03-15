@@ -1,0 +1,4 @@
+#!/bin/sh
+
+AOCL_BOARD_PACKAGE_ROOT="/opt/altera_pro/16.0/hld/board/altera_a10socdk/"
+aoc -v -g -c reduction4.cl --report --board a10soc_2ddr --dot

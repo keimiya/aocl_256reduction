@@ -1,0 +1,3 @@
+bin/reduction_float16
+to_a10soc/*
+emu_go

@@ -32,21 +32,23 @@ __kernel void reduction_float16(__global volatile const float16* restrict input_
 	// 1st level: directory read the input value from DDR
 	level2[0] = input_ddr[i].s0 + input_ddr[i].s1; // fp32 add takes 3[cycle]
 	level2[1] = input_ddr[i].s2 + input_ddr[i].s3;
+	level3[0] = level2[0] + level2[1]; 	// 2nd level
+
 	level2[2] = input_ddr[i].s4 + input_ddr[i].s5;
 	level2[3] = input_ddr[i].s6 + input_ddr[i].s7;
+	level3[1] = level2[2] + level2[3];
+	
+	level4[0] = level3[0] + level3[1]; // 3rd level
+	
+
 	level2[4] = input_ddr[i].s8 + input_ddr[i].s9;
 	level2[5] = input_ddr[i].sA + input_ddr[i].sB;
+	level3[2] = level2[4] + level2[5];
+
 	level2[6] = input_ddr[i].sC + input_ddr[i].sD;
 	level2[7] = input_ddr[i].sE + input_ddr[i].sF;
-
-	// 2nd level
-	level3[0] = level2[0] + level2[1];
-	level3[1] = level2[2] + level2[3];
-	level3[2] = level2[4] + level2[5];
 	level3[3] = level2[6] + level2[7];
 
-	// 3rd level
-	level4[0] = level3[0] + level3[1];
 	level4[1] = level3[2] + level3[3];
 
 	// 4th level

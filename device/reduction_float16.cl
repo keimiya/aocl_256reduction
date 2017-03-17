@@ -17,39 +17,45 @@ __kernel void reduction_float16(__global volatile const float16* restrict input_
 				__global  float* restrict output_ddr)
 {
     const int REDUCTION_SIZE = 256;
-    const int INPUT_WIDTH    = 16; // equal to float16
+    const int INPUT_WIDTH    = 16;// equal to float16
+    const int ARRAY_INDEX    = REDUCTION_SIZE/INPUT_WIDTH;
     float sum = 0.0e0;
 
-    float8 level2[REDUCTION_SIZE/INPUT_WIDTH];
-    float4 level3[REDUCTION_SIZE/INPUT_WIDTH];
-    float2 level4[REDUCTION_SIZE/INPUT_WIDTH];
-    float level5[REDUCTION_SIZE/INPUT_WIDTH];
+    float level2[REDUCTION_SIZE>>1];
+    float level3[REDUCTION_SIZE>>2];
+    float level4[REDUCTION_SIZE>>3];
+    float level5[REDUCTION_SIZE>>4];
+
+    const int level2_base_index = ARRAY_INDEX >> 1;
+    const int level3_base_index = ARRAY_INDEX >> 2;
+    const int level4_base_index = ARRAY_INDEX >> 3;
+    const int level5_base_index = ARRAY_INDEX >> 4;
 
     // Each level of reduction takes 3[cycle] since all the adds are run in parallel
-    for (int i = 0; i < REDUCTION_SIZE/INPUT_WIDTH; i++){
+    for (int i = 0; i < ARRAY_INDEX; i++){
 
 	// 1st level: directory read the input value from DDR
-	level2[i].s0 = input_ddr[i].s0 + input_ddr[i].s1; // fp32 add takes 3[cycle]
-	level2[i].s1 = input_ddr[i].s2 + input_ddr[i].s3;
-	level2[i].s2 = input_ddr[i].s4 + input_ddr[i].s5;
-	level2[i].s3 = input_ddr[i].s6 + input_ddr[i].s7;
-	level2[i].s4 = input_ddr[i].s8 + input_ddr[i].s9;
-	level2[i].s5 = input_ddr[i].sA + input_ddr[i].sB;
-	level2[i].s6 = input_ddr[i].sC + input_ddr[i].sD;
-	level2[i].s7 = input_ddr[i].sE + input_ddr[i].sF;
+	level2[(level2_base_index * i) + 0] = input_ddr[i].s0 + input_ddr[i].s1; // fp32 add takes 3[cycle]
+	level2[(level2_base_index * i) + 1] = input_ddr[i].s2 + input_ddr[i].s3;
+	level2[(level2_base_index * i) + 2] = input_ddr[i].s4 + input_ddr[i].s5;
+	level2[(level2_base_index * i) + 3] = input_ddr[i].s6 + input_ddr[i].s7;
+	level2[(level2_base_index * i) + 4] = input_ddr[i].s8 + input_ddr[i].s9;
+	level2[(level2_base_index * i) + 5] = input_ddr[i].sA + input_ddr[i].sB;
+	level2[(level2_base_index * i) + 6] = input_ddr[i].sC + input_ddr[i].sD;
+	level2[(level2_base_index * i) + 7] = input_ddr[i].sE + input_ddr[i].sF;
 
 	// 2nd level
-	level3[i].s0 = level2[i].s0 + level2[i].s1;
-	level3[i].s1 = level2[i].s2 + level2[i].s3;
-	level3[i].s2 = level2[i].s4 + level2[i].s5;
-	level3[i].s3 = level2[i].s6 + level2[i].s7;
+	level3[(level3_base_index * i) + 0] = level2[(level2_base_index * i) + 0] + level2[(level2_base_index * i) + 1];
+	level3[(level3_base_index * i) + 1] = level2[(level2_base_index * i) + 2] + level2[(level2_base_index * i) + 3];
+	level3[(level3_base_index * i) + 2] = level2[(level2_base_index * i) + 4] + level2[(level2_base_index * i) + 5];
+	level3[(level3_base_index * i) + 3] = level2[(level2_base_index * i) + 6] + level2[(level2_base_index * i) + 7];
 
 	// 3rd level
-	level4[i].s0 = level3[i].s0 + level3[i].s1;
-	level4[i].s1 = level3[i].s2 + level3[i].s3;
+	level4[(level4_base_index * i) + 0] = level3[(level3_base_index * i) + 0] + level3[(level3_base_index * i) + 1];
+	level4[(level4_base_index * i) + 1] = level3[(level3_base_index * i) + 2] + level3[(level3_base_index * i) + 3];
 
 	// 4th level
-	level5[i] = level4[i].s0 + level4[i].s1;
+	level5[(level5_base_index * i) + 0] = level4[(level4_base_index * i) + 0] + level4[(level4_base_index * i) + 1];	
     }
 
 #pragma unroll

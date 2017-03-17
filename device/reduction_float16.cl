@@ -10,14 +10,14 @@
 
 /**
  * AOCL device code
- * @param input_ddr float16 (32bit*16=512bit=64byte) from DDR4-2133
+ * @param input_ddr float16 (32bit*16=512bit=64byte) from DDR4-2133. It's non Stall-free, and what's Stall-free?
  * @param output_ddr 
  */
-__kernel void reduction_float16(__global  const float16* restrict input_ddr,
+__kernel void reduction_float16(__global volatile const float16* restrict input_ddr,
 				__global  float* restrict output_ddr)
 {
     const int REDUCTION_SIZE = 256;
-    const int INPUT_WIDTH    = 16; // equal to float16
+    const int INPUT_WIDTH    = 16; // equal to float
     float sum = 0.0e0;
 
     float buf1[REDUCTION_SIZE];
@@ -31,10 +31,12 @@ __kernel void reduction_float16(__global  const float16* restrict input_ddr,
     float buf9;
     float16 temp;
 
-    // 1st level: directory read the input value from DDR    
+    // 1st level: directory read the input value from DDR
+    // An iteration of the following loop takes 3[cycle] since all the adds are run in parallel
+#pragma unroll
     for (int i = 0; i < REDUCTION_SIZE/INPUT_WIDTH; i++){
-	temp = input_ddr[i];
-	buf1[(i*INPUT_WIDTH)+0] = temp.s0 + temp.s1;
+	temp = input_ddr[i]; // soto ni dasu?
+	buf1[(i*INPUT_WIDTH)+0] = temp.s0 + temp.s1; // fp32 add takes 3[cycle]
 	buf1[(i*INPUT_WIDTH)+1] = temp.s2 + temp.s3;
 	buf1[(i*INPUT_WIDTH)+2] = temp.s4 + temp.s5;
 	buf1[(i*INPUT_WIDTH)+3] = temp.s6 + temp.s7;
@@ -50,11 +52,11 @@ __kernel void reduction_float16(__global  const float16* restrict input_ddr,
 
 #pragma unroll 
     for (int i = 0; i < (REDUCTION_SIZE>>2); i++)
-	buf3[i] = buf2[i*2+0] + buf2[i*2+1];  
+	buf3[i] = buf2[i*2+0] + buf2[i*2+1];
 
 #pragma unroll 
     for (int i = 0; i < (REDUCTION_SIZE>>3); i++)
-	buf4[i] = buf3[i*2+0] + buf3[i*2+1];  
+	buf4[i] = buf3[i*2+0] + buf3[i*2+1];
 
 #pragma unroll
     for (int i = 0; i < (REDUCTION_SIZE>>4); i++)
@@ -74,8 +76,6 @@ __kernel void reduction_float16(__global  const float16* restrict input_ddr,
 
     buf9 = buf8[0] + buf8[1];
     sum += buf9;
-    /* } */
-    /* } */
     *output_ddr = sum;
 }
 

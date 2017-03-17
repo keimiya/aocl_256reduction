@@ -4,7 +4,7 @@
  * @par   Input width is float16(32bit*16=512bit=64byte)
  * @date  2017/03/14 Copy noda-chan's reduction_single_1k
  * @date  2017/03/15 Start implementing float16 version
- * @ToDo  Understan the number of DDR4's bank
+ * @ToDo  The number of DDR4's bank is 2.
  * @author T.Miyajima
  */
 
@@ -17,65 +17,45 @@ __kernel void reduction_float16(__global volatile const float16* restrict input_
 				__global  float* restrict output_ddr)
 {
     const int REDUCTION_SIZE = 256;
-    const int INPUT_WIDTH    = 16; // equal to float
+    const int INPUT_WIDTH    = 16; // equal to float16
     float sum = 0.0e0;
 
-    float buf1[REDUCTION_SIZE];
-    float buf2[REDUCTION_SIZE>>1];
-    float buf3[REDUCTION_SIZE>>2];
-    float buf4[REDUCTION_SIZE>>3];
-    float buf5[REDUCTION_SIZE>>4];
-    float buf6[REDUCTION_SIZE>>5];
-    float buf7[REDUCTION_SIZE>>6];
-    float buf8[REDUCTION_SIZE>>7];
-    float buf9;
-    float16 temp;
+    float8 level2[REDUCTION_SIZE/INPUT_WIDTH];
+    float4 level3[REDUCTION_SIZE/INPUT_WIDTH];
+    float2 level4[REDUCTION_SIZE/INPUT_WIDTH];
+    float level5[REDUCTION_SIZE/INPUT_WIDTH];
 
-    // 1st level: directory read the input value from DDR
-    // An iteration of the following loop takes 3[cycle] since all the adds are run in parallel
-#pragma unroll
+    // Each level of reduction takes 3[cycle] since all the adds are run in parallel
     for (int i = 0; i < REDUCTION_SIZE/INPUT_WIDTH; i++){
-	temp = input_ddr[i]; // soto ni dasu?
-	buf1[(i*INPUT_WIDTH)+0] = temp.s0 + temp.s1; // fp32 add takes 3[cycle]
-	buf1[(i*INPUT_WIDTH)+1] = temp.s2 + temp.s3;
-	buf1[(i*INPUT_WIDTH)+2] = temp.s4 + temp.s5;
-	buf1[(i*INPUT_WIDTH)+3] = temp.s6 + temp.s7;
-	buf1[(i*INPUT_WIDTH)+4] = temp.s8 + temp.s9;
-	buf1[(i*INPUT_WIDTH)+5] = temp.sA + temp.sB;
-	buf1[(i*INPUT_WIDTH)+6] = temp.sC + temp.sD;
-	buf1[(i*INPUT_WIDTH)+7] = temp.sE + temp.sF;
+
+	// 1st level: directory read the input value from DDR
+	level2[i].s0 = input_ddr[i].s0 + input_ddr[i].s1; // fp32 add takes 3[cycle]
+	level2[i].s1 = input_ddr[i].s2 + input_ddr[i].s3;
+	level2[i].s2 = input_ddr[i].s4 + input_ddr[i].s5;
+	level2[i].s3 = input_ddr[i].s6 + input_ddr[i].s7;
+	level2[i].s4 = input_ddr[i].s8 + input_ddr[i].s9;
+	level2[i].s5 = input_ddr[i].sA + input_ddr[i].sB;
+	level2[i].s6 = input_ddr[i].sC + input_ddr[i].sD;
+	level2[i].s7 = input_ddr[i].sE + input_ddr[i].sF;
+
+	// 2nd level
+	level3[i].s0 = level2[i].s0 + level2[i].s1;
+	level3[i].s1 = level2[i].s2 + level2[i].s3;
+	level3[i].s2 = level2[i].s4 + level2[i].s5;
+	level3[i].s3 = level2[i].s6 + level2[i].s7;
+
+	// 3rd level
+	level4[i].s0 = level3[i].s0 + level3[i].s1;
+	level4[i].s1 = level3[i].s2 + level3[i].s3;
+
+	// 4th level
+	level5[i] = level4[i].s0 + level4[i].s1;
     }
 
-#pragma unroll 
-    for (int i = 0; i < (REDUCTION_SIZE>>1); i++)
-	buf2[i] = buf1[i*2 + 0] + buf1[i*2 + 1];
-
-#pragma unroll 
-    for (int i = 0; i < (REDUCTION_SIZE>>2); i++)
-	buf3[i] = buf2[i*2+0] + buf2[i*2+1];
-
-#pragma unroll 
-    for (int i = 0; i < (REDUCTION_SIZE>>3); i++)
-	buf4[i] = buf3[i*2+0] + buf3[i*2+1];
-
 #pragma unroll
-    for (int i = 0; i < (REDUCTION_SIZE>>4); i++)
-	buf5[i] = buf4[i*2+0] + buf4[i*2+1];
+    for (int i = 0; i <REDUCTION_SIZE/INPUT_WIDTH; i++)
+	sum += level5[i];
 
-#pragma unroll
-    for (int i = 0; i < (REDUCTION_SIZE>>5); i++)
-	buf6[i] = buf5[i*2+0] + buf5[i*2+1];
-
-#pragma unroll
-    for (int i = 0; i < (REDUCTION_SIZE>>6); i++)
-	buf7[i] = buf6[i*2+0] + buf6[i*2+1];
-
-#pragma unroll
-    for (int i = 0; i < (REDUCTION_SIZE>>7); i++)
-	buf8[i] = buf7[i*2+0] + buf7[i*2+1];
-
-    buf9 = buf8[0] + buf8[1];
-    sum += buf9;
     *output_ddr = sum;
 }
 

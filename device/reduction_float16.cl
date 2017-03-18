@@ -17,17 +17,17 @@ __kernel void reduction_float16(__global volatile const float16* restrict input_
 				__global  float* restrict output_ddr)
 {
     const int REDUCTION_SIZE = 256;
-    const int INPUT_WIDTH    = 16;// equal to float16
-    const int ARRAY_INDEX    = REDUCTION_SIZE/INPUT_WIDTH;
+    const int INPUT_WIDTH    = 16; // equal to float16
+    const int REDUCTION_ITERATION = REDUCTION_SIZE/INPUT_WIDTH;
     float sum = 0.0e0;
 
-    float level2[8];
-    float level3[4];
-    float level4[2];
-    float level5[16];
+    float level2[INPUT_WIDTH>>1];
+    float level3[INPUT_WIDTH>>2];
+    float level4[INPUT_WIDTH>>3];
+    float level5[REDUCTION_ITERATION];
 
     // Each level of reduction takes 3[cycle] since all the adds are run in parallel
-    for (int i = 0; i < ARRAY_INDEX; i++){
+    for (int i = 0; i < REDUCTION_ITERATION; i++){
 
 	// 1st level: directory read the input value from DDR
 	level2[0] = input_ddr[i].s0 + input_ddr[i].s1; // fp32 add takes 3[cycle]
@@ -50,11 +50,11 @@ __kernel void reduction_float16(__global volatile const float16* restrict input_
 	level4[1] = level3[2] + level3[3];
 
 	// 4th level
-	level5[(i) + 0] = level4[0] + level4[1];
+	level5[i + 0] = level4[0] + level4[1];
     }
 
 #pragma unroll
-    for (int i = 0; i <REDUCTION_SIZE/INPUT_WIDTH; i++)
+    for (int i = 0; i < REDUCTION_ITERATION; i++)
 	sum += level5[i];
 
     *output_ddr = sum;

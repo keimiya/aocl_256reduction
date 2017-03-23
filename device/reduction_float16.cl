@@ -2,10 +2,10 @@
  * @file reduction_float16.cl
  * @brief Device kernel code for 256-elements reduction written in Altera OpenCL.
  * @par   Input width is float16(32bit*16=512bit=64byte)
- * @date  2017/03/14 Copy noda-chan's reduction_single_1k
+ * @date  2017/03/14 Copy kouhai's reduction_single_1k
  * @date  2017/03/15 Start implementing float16 version
  * @ToDo  The number of DDR4's bank is 2.
- * @author T.Miyajima
+ * @author keimiya
  */
 
 /**
@@ -14,7 +14,7 @@
  * @param num_of_cell 270*310=83,700 cells
  * @param output_ddr 
  */
-__kernel void reduction_float16(__global const float16* restrict input_ddr,
+__kernel void reduction_float16(__global const float* restrict input_ddr,
 				unsigned int cells, // 83,700 cells
 				__global float* restrict output_ddr)
 {
@@ -31,14 +31,14 @@ __kernel void reduction_float16(__global const float16* restrict input_ddr,
     //#pragma unroll 1
     for (int i = 0; i < cells*REDUCTION_ITERATION; i++){
 	// 1st level: 
-	level2[0] = input_ddr[i].s0 + input_ddr[i].s1;
-	level2[1] = input_ddr[i].s2 + input_ddr[i].s3;
-	level2[2] = input_ddr[i].s4 + input_ddr[i].s5;
-	level2[3] = input_ddr[i].s6 + input_ddr[i].s7;
-	level2[4] = input_ddr[i].s8 + input_ddr[i].s9;
-	level2[5] = input_ddr[i].sA + input_ddr[i].sB;
-	level2[6] = input_ddr[i].sC + input_ddr[i].sD;
-	level2[7] = input_ddr[i].sE + input_ddr[i].sF;
+	level2[0] = input_ddr[i+0] + input_ddr[i+1];
+	level2[1] = input_ddr[i+2] + input_ddr[i+3];
+	level2[2] = input_ddr[i+4] + input_ddr[i+5];
+	level2[3] = input_ddr[i+6] + input_ddr[i+7];
+	level2[4] = input_ddr[i+8] + input_ddr[i+9];
+	level2[5] = input_ddr[i+10] + input_ddr[i+11];
+	level2[6] = input_ddr[i+12] + input_ddr[i+13];
+	level2[7] = input_ddr[i+14] + input_ddr[i+15];
 	// 2nd level
 	level3[0] = level2[0] + level2[1];
 	level3[1] = level2[2] + level2[3];

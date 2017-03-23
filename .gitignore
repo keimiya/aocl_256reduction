@@ -3,3 +3,4 @@ to_a10soc/*
 emu_go
 others/*
 nohup.out
+.nfs*

@@ -9,7 +9,7 @@ using namespace aocl_utils;
  
 // OpenCL runtime configuration
 cl_platform_id platform = NULL;
-unsigned num_devices = 0;
+unsigned num_devices = 1;
 scoped_array<cl_device_id> device; // num_devices elements
 cl_context context = NULL;
 scoped_array<cl_command_queue> queue; // num_devices elements
@@ -20,7 +20,9 @@ scoped_array<cl_mem> input_a_buf; // num_devices elements
 scoped_array<cl_mem> output_buf; // num_devices elements
 //scoped_aligned_ptr<cl_mem> output_buf;
 // Problem data.
-unsigned N = 256; // problem size
+unsigned N = 256*100000; // problem size
+unsigned int cells = 310 * 270;
+unsigned int particles = 256 * cells;
 scoped_array<scoped_aligned_ptr<float> > input_a; // num_devices elements
 //scoped_array<scoped_aligned_ptr<double> > output; // num_devices elements
 scoped_array<float> output;
@@ -142,8 +144,8 @@ bool init_opencl() {
 
 	// Input buffers.
 	//3. メモリオブジェクトの作成
-	input_a_buf[i] = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, 
-					n_per_device[i] * sizeof(float), NULL, &status);
+	input_a_buf[i] = clCreateBuffer(context, CL_MEM_READ_ONLY, 
+					sizeof(float) * particles, NULL, &status);
 	checkError(status, "Failed to create buffer for input A");
 
 	/*  input_b_buf[i] = clCreateBuffer(context, CL_MEM_READ_ONLY, 
@@ -151,7 +153,7 @@ bool init_opencl() {
 	    checkError(status, "Failed to create buffer for input B");
 	*/
 	// Output buffer.
-	output_buf[i] = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, 
+	output_buf[i] = clCreateBuffer(context, CL_MEM_WRITE_ONLY, 
 				       sizeof(float), NULL, &status);
 	checkError(status, "Failed to create buffer for output");
     }
@@ -180,11 +182,11 @@ void init_problem() {
 	//ref_output[i].reset(n_per_device[i]);
 	ref_output[i] = 0.0e0;
 	output[i] = 0.0e0;
-	for(unsigned j = 0; j < n_per_device[i]; ++j) 
-	    input_a[i][j] = rand_float();
+	for(unsigned j = 0; j < particles; ++j) 
+	    input_a[i][j] = 1,0; //rand_float();
 	//      ref_output[i] += input_a[i][j];
 	const double start_cpu_time = getCurrentTimestamp();
-	for(unsigned j = 0; j < n_per_device[i]; ++j) {
+	for(unsigned j = 0; j < particles; ++j) {
 	    ref_output[i] += input_a[i][j];
 	}
 	float sum = ref_output[i];
@@ -211,14 +213,22 @@ void run() {
 	// for the host-to-device transfer.
 	cl_event write_event[2];
 	//input_aの転
-        float *input_ptr = (float*)clEnqueueMapBuffer(queue[i], input_a_buf[i], CL_FALSE, CL_MAP_READ | CL_MAP_WRITE, 0, n_per_device[i] * sizeof(float), 0, NULL, &write_event[0], &status);
-	checkError(status, "Failed to map input");
-	for (unsigned k = 0; k < n_per_device[i]; k++)
-	    input_ptr[k] = input_a[0][k];
+	//printf("koko\n");
+	status = clEnqueueWriteBuffer(queue[i], input_a_buf[i], CL_FALSE,
+				      // 0, n_per_device[i] * sizeof(float), input_a[i], 0, NULL, &write_event[0]);
+				      0, sizeof(float)*particles, input_a[i], 0, NULL, &write_event[0]);	
+	checkError(status, "Failed to transfer input A");
+	//printf("koko\n");
+	
+	/*
+	  float *input_ptr = (float*)clEnqueueMapBuffer(queue[i], input_a_buf[i], CL_FALSE, CL_MAP_READ | CL_MAP_WRITE, 0, n_per_device[i] * sizeof(float), 0, NULL, &write_event[0], &status);
+	  checkError(status, "Failed to map input");
+	  for (unsigned k = 0; k < n_per_device[i]; k++)
+	  input_ptr[k] = input_a[0][k];
 
-        float *output_ptr = (float*)clEnqueueMapBuffer(queue[i], output_buf[i], CL_FALSE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(float), 0, NULL, &write_event[1], &status);
-	checkError(status, "Failed to map output");
-
+	  float *output_ptr = (float*)clEnqueueMapBuffer(queue[i], output_buf[i], CL_FALSE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(float), 0, NULL, &write_event[1], &status);
+	  checkError(status, "Failed to map output");
+	*/
 	/*status = clEnqueueWriteBuffer(queue[i], input_a_buf[i], CL_FALSE,
 	  0, n_per_device[i] * sizeof(float), input_a[i], 0, NULL, &write_event[0]);
 	  checkError(status, "Failed to transfer input A");
@@ -226,13 +236,15 @@ void run() {
 	/*
 	//outputの転送
 	status = clEnqueueWriteBuffer(queue[i], output_buf[i], CL_FALSE,
-	0, sizeof(double), output, 0, NULL, &write_event[1]);
+	0, sizeof(do), output, 0, NULL, &write_event[1]);
 	checkError(status, "Failed to transfer output");
 	*/
 	// Set kernel arguments.
 	unsigned argi = 0;
 	//カーネル引数の設定
 	status = clSetKernelArg(kernel[i], argi++, sizeof(cl_mem), &input_a_buf[i]);
+	checkError(status, "Failed to set argument %d", argi - 1);
+	status = clSetKernelArg(kernel[i], argi++, sizeof(cells), &cells);
 	checkError(status, "Failed to set argument %d", argi - 1);
 	status = clSetKernelArg(kernel[i], argi++, sizeof(cl_mem), &output_buf[i]);
 	checkError(status, "Failed to set argument %d", argi - 1);
@@ -250,9 +262,10 @@ void run() {
 	const size_t global_work_size = n_per_device[i];
 	// printf("Launching for device %d (%d elements)\n", i, global_work_size);
 	//カーネル実行
-
+	//printf("koko\n");
 	//	const double start_k_time = getCurrentTimestamp();
 	status = clEnqueueTask(queue[i], kernel[i], 1, write_event, &kernel_event[i]);
+
 	/* status = clEnqueueNDRangeKernel(queue[i], kernel[i], 1, NULL,
 	   &global_work_size, NULL, 1, write_event, &kernel_event[i]);*/
 	checkError(status, "Failed to launch kernel");
@@ -260,9 +273,11 @@ void run() {
 	
 	//	printf("\nKernel time(getCurrentTimestamp) %f ms\n", (end_k_time - start_k_time) * 1e3);
 	clWaitForEvents(num_devices, kernel_event);
-	output[i] = *output_ptr;
-
-
+	//output[i] = *output_ptr;
+	//printf("koko\n");
+	status = clEnqueueReadBuffer(queue[i], output_buf[i], CL_FALSE,
+				     0, sizeof(float), output, 1, &kernel_event[i], &finish_event[i]);
+	//printf("koko\n");
 	// Read the result. This the final operation.
 	//
 	/*	status = clEnqueueReadBuffer(queue[i], output_buf[i], CL_FALSE,
@@ -270,11 +285,11 @@ void run() {
 	*/
 	// Release local events.
 	clReleaseEvent(write_event[0]);
-	clReleaseEvent(write_event[1]);
-	status = clEnqueueUnmapMemObject(queue[i], input_a_buf[i], input_ptr, 0, NULL, NULL);
-	checkError(status, "Failed to unmap input");
-	status = clEnqueueUnmapMemObject(queue[i], output_buf[i], output_ptr, 0, NULL, NULL);
-	checkError(status, "Failed to unmap output");
+	//clReleaseEvent(write_event[1]);
+	//status = clEnqueueUnmapMemObject(queue[i], input_a_buf[i], input_ptr, 0, NULL, NULL);
+	//checkError(status, "Failed to unmap input");
+	//status = clEnqueueUnmapMemObject(queue[i], output_buf[i], output_ptr, 0, NULL, NULL);
+	//checkError(status, "Failed to unmap output");
     }
 
     // Wait for all devices to finish.
